@@ -1,11 +1,11 @@
 /********************
- * 	Written by Giuseppe Astrologo
+ * Written by Giuseppe Astrologo
  * 
- *  Allows you to encrypt and decrypt data interchangeably on both Java and PHP.
- *  I needed to write this to read encrypted data from a MySQL database that my website inserts data into.
+ * Allows you to encrypt and decrypt data interchangeably on both Java and PHP.
+ * I needed to write this to read encrypted data from a MySQL database that my website inserts data into.
  * 
- *  The original DefusePHP was written by Taylor Hornby and Scott Arciszewski
- * 	https://github.com/defuse/php-encryption
+ * The original DefusePHP was written by Taylor Hornby and Scott Arciszewski
+ * https://github.com/defuse/php-encryption
  * 
  */
 
@@ -39,16 +39,16 @@ public class Encryption {
 	private static final String AUTHENTICATION_INFO = "DefusePHP|KeyForAuthentication";
 	
 	/****************************
-	 * Translation of the hashing function from PHP
-	 * Generate a keyed hash value using the Mac method
-	 * 
-	 * @param byte[] ciphertext
-	 * @param byte[] akey
-	 * @return byte[]
-	 * 
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeyException
-	 */
+	* Translation of the hashing function from PHP
+	* Generate a keyed hash value using the Mac method
+	* 
+	* @param byte[] ciphertext
+	* @param byte[] akey
+	* @return byte[]
+	* 
+	* @throws NoSuchAlgorithmException
+	* @throws InvalidKeyException
+	*/
 	private static byte[] hash_hmac(byte[] ciphertext, byte[] akey) throws NoSuchAlgorithmException, InvalidKeyException {
 		SecretKey secretKey = null;
 
@@ -63,20 +63,20 @@ public class Encryption {
 		return mac.doFinal(text);
 	}
 	/**
-     * Use HKDF to derive multiple keys from one.
-     * http://tools.ietf.org/html/rfc5869
-     * 
-     * @param byte[] ikm Initial Keying Material
-     * @param int length How many bytes?
-     * @param string info What sort of key are we deriving?
-     * @param string salt
-     * @return string
-     * 
-     * @throws InvalidKeyException
-	 * @throws NoSuchAlgorithmException
-	 * @throws BadLengthException
-	 * @throws BadHKDFException
-     */
+    * Use HKDF to derive multiple keys from one.
+    * http://tools.ietf.org/html/rfc5869
+    * 
+    * @param byte[] ikm Initial Keying Material
+    * @param int length How many bytes?
+    * @param string info What sort of key are we deriving?
+    * @param string salt
+    * @return string
+    * 
+    * @throws InvalidKeyException
+	* @throws NoSuchAlgorithmException
+	* @throws BadLengthException
+	* @throws BadHKDFException
+    */
 	private static byte[] HKDF(byte[] ikm, int length, String info, String salt) throws InvalidKeyException, NoSuchAlgorithmException, BadLengthException, BadHKDFException {
 		 int digestLength = MAC_BYTE_SIZE;
 		 //TO-DO: MAKE EXCEPTIONS
@@ -165,14 +165,14 @@ public class Encryption {
 		return new String(Base64.encodeBase64(output));
 	}
 	/**
-     * Decrypts a ciphertext.
-     * cipherString is the ciphertext to decrypt.
-     * keyString is the key that the ciphertext was encrypted with.
-     * 
-     * @param string cipherString
-     * @param string keyString
-     * @return String
-     */
+    * Decrypts a ciphertext.
+    * cipherString is the ciphertext to decrypt.
+    * keyString is the key that the ciphertext was encrypted with.
+    * 
+    * @param string cipherString
+    * @param string keyString
+    * @return String
+    */
 	public static String decrypt(String cipherString, String keyString) {
 		byte[] plaintext = new byte[0];
 		try {
@@ -241,23 +241,23 @@ public class Encryption {
 
         return new String(plaintext, StandardCharsets.UTF_8);
 	}
-	 /**
-     * Never call this method directly!
-     * 
-     * Unauthenticated message deryption.
-     * 
-     * @param byte[] ciphertext
-     * @param byte[] key
-     * @param byte[] iv
-     * @return string
-     *  
-     * @throws NoSuchAlgorithmException
-	 * @throws NoSuchPaddingException
-	 * @throws InvalidKeyException
-	 * @throws InvalidAlgorithmParameterException
-     * @throws IllegalBlockSizeException
-	 * @throws BadPaddingException
-     */
+	/**
+    * Never call this method directly!
+    * 
+    * Unauthenticated message deryption.
+    * 
+    * @param byte[] ciphertext
+    * @param byte[] key
+    * @param byte[] iv
+    * @return string
+    *  
+    * @throws NoSuchAlgorithmException
+	* @throws NoSuchPaddingException
+	* @throws InvalidKeyException
+	* @throws InvalidAlgorithmParameterException
+    * @throws IllegalBlockSizeException
+	* @throws BadPaddingException
+    */
 	private static byte[] plainDecrypt(byte[] ciphertext, byte[] key, byte[] iv) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 		IvParameterSpec ivSpec = new IvParameterSpec(iv);
 		SecretKeySpec secret = new SecretKeySpec(key, "AES");
@@ -268,22 +268,22 @@ public class Encryption {
 		return cipher.doFinal(ciphertext);
 	}
 	/**
-     * Never call this method directly!
-     * 
-     * Unauthenticated message encryption.
-     * 
-     * @param byte[] text
-     * @param byte[] key
-     * @param byte[] iv
-     * @return byte[]
-     * 
-     * @throws NoSuchAlgorithmException
-	 * @throws NoSuchPaddingException
-	 * @throws InvalidKeyException
-	 * @throws InvalidAlgorithmParameterException
-     * @throws IllegalBlockSizeException
-	 * @throws BadPaddingException
-     */
+    * Never call this method directly!
+    * 
+    * Unauthenticated message encryption.
+    * 
+    * @param byte[] text
+    * @param byte[] key
+    * @param byte[] iv
+    * @return byte[]
+    * 
+    * @throws NoSuchAlgorithmException
+	* @throws NoSuchPaddingException
+	* @throws InvalidKeyException
+	* @throws InvalidAlgorithmParameterException
+    * @throws IllegalBlockSizeException
+	* @throws BadPaddingException
+    */
 	private static byte[] plainEncrypt(byte[] text, byte[] key, byte[] iv) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException  {
 		IvParameterSpec ivSpec = new IvParameterSpec(iv);
 		SecretKeySpec skeySpec = new SecretKeySpec(key, "AES");
@@ -295,10 +295,10 @@ public class Encryption {
 		return cipher.doFinal(text);
 	}
 	/**
-     * Use this to generate a random encryption key.
-     * 
-     * @return string
-     */
+    * Use this to generate a random encryption key.
+    * 
+    * @return string
+    */
 	public static String createNewRandomKey()
     {
 		SecureRandom random = new SecureRandom();
