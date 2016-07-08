@@ -73,9 +73,9 @@ public class Encryption {
     * @return string
     * 
     * @throws InvalidKeyException
-	* @throws NoSuchAlgorithmException
-	* @throws BadLengthException
-	* @throws BadHKDFException
+    * @throws NoSuchAlgorithmException
+    * @throws BadLengthException
+    * @throws BadHKDFException
     */
 	private static byte[] HKDF(byte[] ikm, int length, String info, String salt) throws InvalidKeyException, NoSuchAlgorithmException, BadLengthException, BadHKDFException {
 		 int digestLength = MAC_BYTE_SIZE;
@@ -252,11 +252,11 @@ public class Encryption {
     * @return string
     *  
     * @throws NoSuchAlgorithmException
-	* @throws NoSuchPaddingException
-	* @throws InvalidKeyException
-	* @throws InvalidAlgorithmParameterException
+    * @throws NoSuchPaddingException
+    * @throws InvalidKeyException
+    * @throws InvalidAlgorithmParameterException
     * @throws IllegalBlockSizeException
-	* @throws BadPaddingException
+    * @throws BadPaddingException
     */
 	private static byte[] plainDecrypt(byte[] ciphertext, byte[] key, byte[] iv) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 		IvParameterSpec ivSpec = new IvParameterSpec(iv);
@@ -278,11 +278,11 @@ public class Encryption {
     * @return byte[]
     * 
     * @throws NoSuchAlgorithmException
-	* @throws NoSuchPaddingException
-	* @throws InvalidKeyException
-	* @throws InvalidAlgorithmParameterException
+    * @throws NoSuchPaddingException
+    * @throws InvalidKeyException
+    * @throws InvalidAlgorithmParameterException
     * @throws IllegalBlockSizeException
-	* @throws BadPaddingException
+    * @throws BadPaddingException
     */
 	private static byte[] plainEncrypt(byte[] text, byte[] key, byte[] iv) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException  {
 		IvParameterSpec ivSpec = new IvParameterSpec(iv);
