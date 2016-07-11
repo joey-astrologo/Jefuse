@@ -44,7 +44,6 @@ package encryption;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -105,9 +104,12 @@ public class Encryption {
         //Don't change hash function and then this won't throw any exceptions!
         try {
             mac = Mac.getInstance(HASH_FUNCTION);
-        } catch(NoSuchAlgorithmException e) {}
-        
-        mac.init(secretKey);
+            mac.init(secretKey);
+        } 
+        catch(NoSuchAlgorithmException e) {}
+        catch(java.security.InvalidKeyException e) {
+            throw new InvalidKeyException("Secret key is invalid.");
+        }
         return mac.doFinal(ciphertext);
     }
 
@@ -279,7 +281,7 @@ public class Encryption {
         }
         catch(NoSuchAlgorithmException e) {} 
         catch (NoSuchPaddingException e) {e.printStackTrace();} 
-        catch (InvalidKeyException e) {e.printStackTrace();} 
+        catch (java.security.InvalidKeyException e) {e.printStackTrace();} 
         catch (InvalidAlgorithmParameterException e) {e.printStackTrace();} 
         catch (IllegalBlockSizeException e) {e.printStackTrace();} 
         catch (BadPaddingException e) {e.printStackTrace();}
@@ -310,7 +312,7 @@ public class Encryption {
         } 
         catch(NoSuchPaddingException e) {e.printStackTrace();}  
         catch (NoSuchAlgorithmException e) {e.printStackTrace();}  
-        catch (InvalidKeyException e) {e.printStackTrace();}  
+        catch (java.security.InvalidKeyException e) {e.printStackTrace();}  
         catch (InvalidAlgorithmParameterException e) {e.printStackTrace();}  
         catch (IllegalBlockSizeException e) {} catch (BadPaddingException e) {e.printStackTrace();} 
         

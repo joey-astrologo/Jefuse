@@ -1,9 +1,9 @@
 package test;
 
-import java.security.InvalidKeyException;
-
 import encryption.CannotPerformOperationException;
 import encryption.Encryption;
+import encryption.InvalidCiphertextException;
+import encryption.InvalidKeyException;
 
 public class Demo {
 
