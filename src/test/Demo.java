@@ -11,7 +11,7 @@ public class Demo {
         // TODO Auto-generated method stub
        String secretKey = Encryption.createNewRandomKey();
        
-       String plainText = "Typical Chinese bullshit, always going after the donuts!";
+       String plainText = "Cool uncle Stu balls.";
        String encryptedText = null;
        try{
            encryptedText = Encryption.encrypt(plainText, secretKey);
