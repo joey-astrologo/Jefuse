@@ -9,6 +9,37 @@
  * 
  */
 
+/*
+ * ORIGINAL DISCLAIMER FROM PHP SOURCE
+ * 
+ * PHP Encryption Library
+ * Copyright (c) 2014-2015, Taylor Hornby
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
 package encryption;
 
 import java.nio.charset.StandardCharsets;
@@ -31,6 +62,24 @@ import org.apache.commons.lang3.ArrayUtils;
 
 public class Encryption {
 
+    // Ciphertext format: [____HMAC____][____IV____][____CIPHERTEXT____].
+
+    /* DO NOT CHANGE THESE CONSTANTS!
+     *
+     * We spent *weeks* testing this code, making sure it is as perfect and
+     * correct as possible. Are you going to do the same after making your
+     * changes? Probably not. Besides, any change to these constants will break
+     * the runtime tests, which are extremely important for your security.
+     * You're literally millions of times more likely to screw up your own
+     * security by changing something here than you are to fall victim to an
+     * 128-bit key brute-force attack. You're also breaking your own
+     * compatibility with future updates to this library, so you'll be left
+     * vulnerable if we ever find a security bug and release a fix.
+     *
+     * So, PLEASE, do not change these constants.
+     */
+    
+    
     private static final String CIPHER_METHOD = "AES/CBC/PKCS5Padding";
     private static final int KEY_BYTE_SIZE = 16;
     private static final String HASH_FUNCTION = "HmacSHA256";
@@ -49,19 +98,16 @@ public class Encryption {
      * @throws NoSuchAlgorithmException
      * @throws InvalidKeyException
      */
-    private static byte[] hash_hmac(byte[] ciphertext, byte[] akey)
-            throws NoSuchAlgorithmException, InvalidKeyException {
-        SecretKey secretKey = null;
-
-        byte[] keyBytes = akey;
-        secretKey = new SecretKeySpec(keyBytes, HASH_FUNCTION);
-
-        Mac mac = Mac.getInstance(HASH_FUNCTION);
+    private static byte[] hash_hmac(byte[] ciphertext, byte[] key) throws InvalidKeyException {
+        SecretKey secretKey = new SecretKeySpec(key, HASH_FUNCTION);
+        Mac mac = null;
+        //Don't change hash function and then this won't throw any exceptions!
+        try {
+            mac = Mac.getInstance(HASH_FUNCTION);
+        } catch(NoSuchAlgorithmException e) {}
+        
         mac.init(secretKey);
-
-        byte[] text = ciphertext;
-
-        return mac.doFinal(text);
+        return mac.doFinal(ciphertext);
     }
 
     /**
@@ -81,16 +127,14 @@ public class Encryption {
      * @throws BadLengthException
      * @throws BadHKDFException
      */
-    private static byte[] HKDF(byte[] ikm, int length, String info, String salt)
-            throws InvalidKeyException, NoSuchAlgorithmException,
-            BadLengthException, BadHKDFException {
+    private static byte[] HKDF(byte[] ikm, int length, String info, String salt) throws InvalidKeyException, CannotPerformOperationException {
         int digestLength = MAC_BYTE_SIZE;
-        // TO-DO: MAKE EXCEPTIONS
+        
         if (length < 0 || length > 255 * digestLength) {
-            throw new BadLengthException("Bad output length requested of HKDF.");
+            throw new InvalidKeyException("Length of second parameter is out of range (0 <= length > 8,160).");
         }
-
-        if (salt.length() <= 0) {
+        //If salt is empty or null, then set to a string of HashLen zeroes
+        if (salt == null || salt.length() <= 0) {
             salt = new String(new char[digestLength]).replace("\0", "\u0000");
         }
 
@@ -115,7 +159,7 @@ public class Encryption {
         byte[] orm = ArrayUtils.subarray(t, 0, length);
 
         if (orm.length <= 0) {
-            throw new BadHKDFException("Bad output generated by HKDF.");
+           throw new CannotPerformOperationException("Could not retrieve first " + length + " octets of T.");
         }
         return orm;
     }
@@ -130,49 +174,26 @@ public class Encryption {
      * @param string
      *            keyString
      * @return string
+     * @throws NoSuchAlgorithmException 
+     * @throws InvalidKeyException 
+     * @throws CannotPerformOperationException 
      */
-    public static String encrypt(String plainText, String keyString) {
+    public static String encrypt(String plainText, String keyString) throws InvalidKeyException, CannotPerformOperationException {
         byte[] output = new byte[1];
-        try {
-            byte[] key = Base64.decodeBase64(keyString.getBytes());
-            byte[] ekey = HKDF(key, KEY_BYTE_SIZE, ENCRYPTION_INFO, "");
+        byte[] key = Base64.decodeBase64(keyString.getBytes());
+        byte[] ekey = HKDF(key, KEY_BYTE_SIZE, ENCRYPTION_INFO, null);
 
-            SecureRandom random = new SecureRandom();
-            byte[] iv = new byte[KEY_BYTE_SIZE];
-            random.nextBytes(iv);
+        SecureRandom random = new SecureRandom();
+        byte[] iv = new byte[KEY_BYTE_SIZE];
+        random.nextBytes(iv);
 
-            byte[] ciphertext = ArrayUtils.addAll(iv,
-                    plainEncrypt(plainText.getBytes(), ekey, iv));
+        byte[] ciphertext = ArrayUtils.addAll(iv, plainEncrypt(plainText.getBytes(), ekey, iv));
 
-            byte[] akey = HKDF(key, KEY_BYTE_SIZE, AUTHENTICATION_INFO, "");
-            byte[] auth = hash_hmac(ciphertext, akey);
+        byte[] akey = HKDF(key, KEY_BYTE_SIZE, AUTHENTICATION_INFO, null);
+        byte[] auth = hash_hmac(ciphertext, akey);
 
-            output = ArrayUtils.addAll(auth, ciphertext);
-        } catch (NoSuchAlgorithmException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InvalidAlgorithmParameterException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (BadLengthException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (BadHKDFException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        output = ArrayUtils.addAll(auth, ciphertext);
+        
         return new String(Base64.encodeBase64(output));
     }
 
@@ -185,74 +206,46 @@ public class Encryption {
      * @param string
      *            keyString
      * @return String
+     * @throws CannotPerformOperationException 
+     * @throws InvalidKeyException 
      */
-    public static String decrypt(String cipherString, String keyString) {
+    public static String decrypt(String cipherString, String keyString) throws InvalidKeyException, CannotPerformOperationException {
         byte[] plaintext = new byte[0];
-        try {
-            byte[] ciphertext = Base64.decodeBase64(cipherString.getBytes());
-            byte[] key = Base64.decodeBase64(keyString.getBytes());
-            // Extract the HMAC from the front of the ciphertext.
-            if (ciphertext.length <= MAC_BYTE_SIZE) {
-                throw new ByteLengthException("Ciphertext is too short.");
-            }
-
-            byte[] hmac = ArrayUtils.subarray(ciphertext, 0, MAC_BYTE_SIZE);
-            if (hmac.length <= 0) {
-                throw new ByteLengthException("HMAC length mismatch");
-            }
-
-            ciphertext = ArrayUtils.subarray(ciphertext, MAC_BYTE_SIZE,
-                    ciphertext.length);
-            if (ciphertext.length <= 0) {
-                throw new ByteLengthException("Ciphertext NULL");
-            }
-
-            byte[] akey = HKDF(key, KEY_BYTE_SIZE, AUTHENTICATION_INFO, "");
-            // TO-DO vefrifyHmac
-            byte[] ekey = HKDF(key, KEY_BYTE_SIZE, ENCRYPTION_INFO, "");
-
-            int ivSize = KEY_BYTE_SIZE;
-
-            if (ciphertext.length <= ivSize) {
-                throw new ByteLengthException("Ciphertext shorter than IV.");
-            }
-            byte[] iv = ArrayUtils.subarray(ciphertext, 0, ivSize);
-            if (iv.length <= 0) {
-                throw new ByteLengthException("IV NULL");
-            }
-            ciphertext = ArrayUtils.subarray(ciphertext, ivSize,
-                    ciphertext.length);
-            if (ciphertext.length <= 0) {
-                throw new ByteLengthException("Ciphertext NULL");
-            }
-            plaintext = plainDecrypt(ciphertext, ekey, iv);
-        } catch (BadHKDFException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (BadLengthException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InvalidAlgorithmParameterException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (ByteLengthException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        byte[] ciphertext = Base64.decodeBase64(cipherString.getBytes());
+        byte[] key = Base64.decodeBase64(keyString.getBytes());
+        // Extract the HMAC from the front of the ciphertext.
+        if (ciphertext.length <= MAC_BYTE_SIZE) {
+            throw new CannotPerformOperationException("Ciphertext is too short.");
         }
+
+        byte[] hmac = ArrayUtils.subarray(ciphertext, 0, MAC_BYTE_SIZE);
+        if (hmac.length <= 0) {
+            throw new CannotPerformOperationException("HMAC is missing.");
+        }
+
+        ciphertext = ArrayUtils.subarray(ciphertext, MAC_BYTE_SIZE, ciphertext.length);
+        if (ciphertext.length <= 0) {
+            throw new CannotPerformOperationException("Ciphertext is missing");
+        }
+
+        byte[] akey = HKDF(key, KEY_BYTE_SIZE, AUTHENTICATION_INFO, "");
+        // TO-DO vefrifyHmac
+        byte[] ekey = HKDF(key, KEY_BYTE_SIZE, ENCRYPTION_INFO, "");
+
+        int ivSize = KEY_BYTE_SIZE;
+
+        if (ciphertext.length <= ivSize) {
+            throw new CannotPerformOperationException("Ciphertext shorter than IV.");
+        }
+        byte[] iv = ArrayUtils.subarray(ciphertext, 0, ivSize);
+        if (iv.length <= 0) {
+            throw new CannotPerformOperationException("IV NULL");
+        }
+        ciphertext = ArrayUtils.subarray(ciphertext, ivSize, ciphertext.length);
+        if (ciphertext.length <= 0) {
+            throw new CannotPerformOperationException("Ciphertext NULL");
+        }
+        plaintext = plainDecrypt(ciphertext, ekey, iv);
 
         return new String(plaintext, StandardCharsets.UTF_8);
     }
@@ -265,26 +258,27 @@ public class Encryption {
      * @param byte[] ciphertext
      * @param byte[] key
      * @param byte[] iv
-     * @return string
-     * 
-     * @throws NoSuchAlgorithmException
-     * @throws NoSuchPaddingException
-     * @throws InvalidKeyException
-     * @throws InvalidAlgorithmParameterException
-     * @throws IllegalBlockSizeException
-     * @throws BadPaddingException
+     * @return byte[]
      */
-    private static byte[] plainDecrypt(byte[] ciphertext, byte[] key, byte[] iv)
-            throws NoSuchAlgorithmException, NoSuchPaddingException,
-            InvalidKeyException, InvalidAlgorithmParameterException,
-            IllegalBlockSizeException, BadPaddingException {
+    private static byte[] plainDecrypt(byte[] ciphertext, byte[] key, byte[] iv) {
         IvParameterSpec ivSpec = new IvParameterSpec(iv);
         SecretKeySpec secret = new SecretKeySpec(key, "AES");
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-
-        cipher.init(Cipher.DECRYPT_MODE, secret, ivSpec);
-
-        return cipher.doFinal(ciphertext);
+        Cipher cipher;
+        byte[] decrypted = null;
+        
+        try {
+            cipher = Cipher.getInstance(CIPHER_METHOD);
+            cipher.init(Cipher.DECRYPT_MODE, secret, ivSpec);
+            decrypted = cipher.doFinal(ciphertext);
+        }
+        catch(NoSuchAlgorithmException e) {} 
+        catch (NoSuchPaddingException e) {e.printStackTrace();} 
+        catch (InvalidKeyException e) {e.printStackTrace();} 
+        catch (InvalidAlgorithmParameterException e) {e.printStackTrace();} 
+        catch (IllegalBlockSizeException e) {e.printStackTrace();} 
+        catch (BadPaddingException e) {e.printStackTrace();}
+        
+        return decrypted;
     }
 
     /**
@@ -296,26 +290,25 @@ public class Encryption {
      * @param byte[] key
      * @param byte[] iv
      * @return byte[]
-     * 
-     * @throws NoSuchAlgorithmException
-     * @throws NoSuchPaddingException
-     * @throws InvalidKeyException
-     * @throws InvalidAlgorithmParameterException
-     * @throws IllegalBlockSizeException
-     * @throws BadPaddingException
      */
-    private static byte[] plainEncrypt(byte[] text, byte[] key, byte[] iv)
-            throws NoSuchAlgorithmException, NoSuchPaddingException,
-            InvalidKeyException, InvalidAlgorithmParameterException,
-            IllegalBlockSizeException, BadPaddingException {
+    private static byte[] plainEncrypt(byte[] text, byte[] key, byte[] iv) {
         IvParameterSpec ivSpec = new IvParameterSpec(iv);
         SecretKeySpec skeySpec = new SecretKeySpec(key, "AES");
         Cipher cipher;
-
-        cipher = Cipher.getInstance(CIPHER_METHOD);
-        cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivSpec);
-
-        return cipher.doFinal(text);
+        byte[] encrypted = null;
+        
+        try {
+            cipher = Cipher.getInstance(CIPHER_METHOD);
+            cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivSpec);
+            encrypted = cipher.doFinal(text);
+        } 
+        catch(NoSuchPaddingException e) {e.printStackTrace();}  
+        catch (NoSuchAlgorithmException e) {e.printStackTrace();}  
+        catch (InvalidKeyException e) {e.printStackTrace();}  
+        catch (InvalidAlgorithmParameterException e) {e.printStackTrace();}  
+        catch (IllegalBlockSizeException e) {} catch (BadPaddingException e) {e.printStackTrace();} 
+        
+        return encrypted;
     }
 
     /**
