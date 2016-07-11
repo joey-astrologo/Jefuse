@@ -47,6 +47,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -208,8 +209,9 @@ public class Encryption {
      * @return String
      * @throws CannotPerformOperationException 
      * @throws InvalidKeyException 
+     * @throws InvalidCiphertextException 
      */
-    public static String decrypt(String cipherString, String keyString) throws InvalidKeyException, CannotPerformOperationException {
+    public static String decrypt(String cipherString, String keyString) throws InvalidKeyException, CannotPerformOperationException, InvalidCiphertextException {
         byte[] plaintext = new byte[0];
         byte[] ciphertext = Base64.decodeBase64(cipherString.getBytes());
         byte[] key = Base64.decodeBase64(keyString.getBytes());
@@ -229,25 +231,29 @@ public class Encryption {
         }
 
         byte[] akey = HKDF(key, KEY_BYTE_SIZE, AUTHENTICATION_INFO, "");
-        // TO-DO vefrifyHmac
-        byte[] ekey = HKDF(key, KEY_BYTE_SIZE, ENCRYPTION_INFO, "");
+        if(verifyHMAC(hmac, ciphertext, akey)) {
+            byte[] ekey = HKDF(key, KEY_BYTE_SIZE, ENCRYPTION_INFO, "");
 
-        int ivSize = KEY_BYTE_SIZE;
+            int ivSize = KEY_BYTE_SIZE;
 
-        if (ciphertext.length <= ivSize) {
-            throw new CannotPerformOperationException("Ciphertext shorter than IV.");
-        }
-        byte[] iv = ArrayUtils.subarray(ciphertext, 0, ivSize);
-        if (iv.length <= 0) {
-            throw new CannotPerformOperationException("IV NULL");
-        }
-        ciphertext = ArrayUtils.subarray(ciphertext, ivSize, ciphertext.length);
-        if (ciphertext.length <= 0) {
-            throw new CannotPerformOperationException("Ciphertext NULL");
-        }
-        plaintext = plainDecrypt(ciphertext, ekey, iv);
+            if (ciphertext.length <= ivSize) {
+                throw new CannotPerformOperationException("Ciphertext shorter than IV.");
+            }
+            byte[] iv = ArrayUtils.subarray(ciphertext, 0, ivSize);
+            if (iv.length <= 0) {
+                throw new CannotPerformOperationException("IV NULL");
+            }
+            ciphertext = ArrayUtils.subarray(ciphertext, ivSize, ciphertext.length);
+            if (ciphertext.length <= 0) {
+                throw new CannotPerformOperationException("Ciphertext NULL");
+            }
+            plaintext = plainDecrypt(ciphertext, ekey, iv);
 
-        return new String(plaintext, StandardCharsets.UTF_8);
+            return new String(plaintext, StandardCharsets.UTF_8);
+        }
+        else {
+            throw new InvalidCiphertextException("Integrity check failed.");
+        }
     }
 
     /**
@@ -321,5 +327,32 @@ public class Encryption {
         byte[] iv = new byte[KEY_BYTE_SIZE];
         random.nextBytes(iv);
         return new String(Base64.encodeBase64(iv), StandardCharsets.UTF_8);
+    }
+    /**
+     * Verify a HMAC 
+     * timing safe
+     * 
+     * @param byte[] correctHMAC HMAC binary
+     * @param byte[] message Ciphertext (raw binary)
+     * @param byte[] key Authentication key (raw binary)
+     * 
+     * @return boolean
+     * @throws InvalidKeyException
+     */
+    private static boolean verifyHMAC(byte[] correctHMAC, byte[] message, byte[] key) {
+        byte[] messageHMAC = null;
+        try {
+            messageHMAC = hash_hmac(message, key);
+        } catch(InvalidKeyException e) {e.printStackTrace();}
+        
+        if (correctHMAC.length != messageHMAC.length) {
+            return false;
+        }
+
+        int result = 0;
+        for (int i = 0; i < correctHMAC.length; i++) {
+          result |= correctHMAC[i] ^ messageHMAC[i];
+        }
+        return result == 0;
     }
 }
